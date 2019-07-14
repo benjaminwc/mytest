@@ -7,167 +7,11 @@
 #include <cstddef> 
 #include <iomanip>
 #include <vector>
-#include <algorithm>  
+#include <algorithm>
+#include "myclock.h"
+#include "elements.h"
 
 using namespace std;
-/*
- *  class Clock,used for time calculation and show
- */
-class Clock {
-    public:
-        void AddMin(unsigned int m_min);
-        void ChangeAmPm();
-        void PrintTime();
-        void Reset(unsigned int h,unsigned int m,unsigned int am);
-    private:
-        unsigned int m_hour;
-        unsigned int m_min;
-        unsigned int m_AM_PM;
-};
-
-void Clock::Reset(unsigned int h,unsigned int m,unsigned int am) {
-  m_hour = h % 12;
-  m_min = m % 60;
-  m_AM_PM = am % 2;
-}
-
-void Clock::ChangeAmPm() {
-    if (m_AM_PM == 0) {
-        m_AM_PM = 1;
-    }
-    else {
-        m_AM_PM = 0;
-    }
-    
-}
-
-void Clock::AddMin(unsigned int mins) {
-    unsigned int add_min = mins + m_min;
-    unsigned int add_hour = add_min / 60;
-    m_min = add_min % 60;
-    unsigned int m_AM_PM_turns = (m_hour + add_hour)/12;
-    m_hour = (m_hour + add_hour)%12;
-    for(unsigned int i=0;i<m_AM_PM_turns;i++) {
-        ChangeAmPm();
-    }
-}
-
-void Clock::PrintTime() {
-    cout << setfill('0') << setw(2) << m_hour << ":" << setfill('0') << setw(2) << m_min << " " << ((m_AM_PM == 1)?"PM":"AM");
-}
-
-/*
- *  class Track & Session & Item
- */
-class Item {
-    public:
-        string m_name;
-        int    m_cost;
-        bool   is_scheduled;
-        bool operator <(const Item &other) const
-        {
-          return m_cost < other.m_cost;
-        }
-        bool operator >(const Item &other) const
-        {   
-            return m_cost > other.m_cost;
-        }
-};
-
-class SessionMorning {
-    public:
-        unsigned int m_remains;
-        vector<class Item> m_items;
-        Clock m_clk;
-        void Show();
-};
-
-void SessionMorning::Show(){
-    //cout << "MORNING MEETING:" << endl;
-    for (vector<class Item>::iterator it = m_items.begin() ; it != m_items.end(); ++it) {
-        m_clk.PrintTime();
-        cout<< " " << it->m_name << " " << it->m_cost << "min" <<endl;
-        m_clk.AddMin(it->m_cost);
-    }
-    m_clk.PrintTime();
-    cout<< " Networking Event" <<endl;
-}
-
-class SessionAfternoon {
-    public:
-        unsigned int m_remains;
-        vector<class Item> m_items;
-        Clock m_clk;
-        void Show();
-};
-
-void SessionAfternoon::Show(){
-    //cout << "AFTERNOON MEETING:" << endl;
-    for (vector<class Item>::iterator it = m_items.begin() ; it != m_items.end(); ++it) {
-        m_clk.PrintTime();
-        cout<< " " << it->m_name << " " << it->m_cost << "min" <<endl;
-        m_clk.AddMin(it->m_cost);
-    }
-    m_clk.PrintTime();
-    cout<< " Networking Event" <<endl;
-}
-
-class ItemSets {
-    public:
-        unsigned int m_totals;
-        vector <class Item> m_items;
-        void Show();
-        void SortItems();
-        bool IsFinish();//whether all the items have already been scheduled 
-};
-
-void ItemSets::Show(){
-  for (vector<class Item>::iterator it = m_items.begin() ; it != m_items.end(); ++it) {
-    cout << "[name]" << it->m_name << ",[cost]" << it->m_cost << ",[is_scheduled]" << it->is_scheduled <<endl;
-  }
-}
-
-void ItemSets::SortItems(){
-    //sort items by time costs
-    sort(m_items.begin(),m_items.end());
-    reverse(m_items.begin(),m_items.end());
-}
-
-bool ItemSets::IsFinish(){
-    for (vector<class Item>::iterator it = m_items.begin() ; it != m_items.end(); ++it) {
-        if(it->is_scheduled == 0) {
-            return false;
-        } 
-    }
-    return true;
-}
-
-class Track {
-    public:
-        bool m_scheduled;
-        class SessionMorning m_morning_session;
-        class SessionAfternoon m_afternoon_session;
-};
-
-class TrackSets {
-    public:
-        unsigned int m_valid_days;
-        vector <class Track> m_tracks;
-        void Show();
-};
-
-void TrackSets::Show(){
-    int i = 0;
-    for (vector<class Track>::iterator it = m_tracks.begin() ; it != m_tracks.end(); ++it) {
-        if(i > m_valid_days){
-            return;
-        }
-        cout << "TRACK " << i+1 << endl;
-        it->m_morning_session.Show();
-        it->m_afternoon_session.Show();
-        i++;
-    }
-}
 
 /*
  *  extract topic name & time cost from input txt file
@@ -259,6 +103,39 @@ int ScheduleItems(class ItemSets &items ,class TrackSets &tracks){
     }
     return SCHEDULE_FAILED;
 }
+
+/*
+ *  basic elements  
+ * 
+ * 
+       TrackSets                                                     +----------------+
+                                                                     |  topic_name    |
+        +----------------+                         +---------+       +----------------+
+      +----------------+ |                         |  item   +<------+  time_cost     |
+    +----------------+ | |                         +---------+       +----------------+
+  +----------------+ | | |                         |  item   |       |  is_scheduled  |
++----------------| | | | |                         +---------+       |----------------+
+|----------------| | | | |                         |  ...    |
+||    remains   || | | | |                         +---------+
+|| +----------+ || | | | |         +---------+     |         |
+|| |   item   | || | | | | <-------+  item   |     +---------+
+|| +----------+ || | | | |         |---------+     |         |
+|| |          | || | | | |                         +---------+
+|| +------Items || | | | |                         |         |
+|------S_Morning|| | | | |                         |         |
+|----------------| | | | |                         |         |
+||    remains   || | | | |         +---------+     |         |
+|| +----------+ || | | | | <-------+  item   |     |         |
+|| |          | || | | | |         |---------+     |         |
+|| +----------+ || | | | 4                         |         |
+|| |          | || | | 3                           |         |
+|| +------Items || | 2                             |         |
+||              || 1                               |         |
+|-----S_Afternoon|                                 +----ItemSets
++-----------Track0
+ *
+ *  function main
+ */
 
 int main()
 {
